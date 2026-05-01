@@ -1,5 +1,21 @@
+;; basename_noext ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (re-re-match re string buffer)
+        "Workaround GIMP 2.10 bug https://gitlab.gnome.org/GNOME/gimp/issues/2965"
+        (and (re-match re string)
+             (re-match re string buffer)))
+(define (basename_noext path)
+        (let ((buffer (vector "" "" "")))
+          (if (re-re-match "/([^/.]+)\\.([^.]+)$" path buffer)
+              (substring path
+                         (car (vector-ref buffer 1))
+                         (cdr (vector-ref buffer 1)))
+            "")))
+;; debugdispay ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (debugdispay pre body)
+  (display pre)(display body)(newline))
+
 ;; export png ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define (script-fu-my-export-png indir topX topY w h resizeW)
+(define (script-fu-my-export-png indir expdir topX topY w h resizeW)
   (let* ((flist           ())
          (export-img      ())
          (export-drawable ())
@@ -64,10 +80,14 @@
 
                 ;; (set! export-drawable
                 ;;       (gimp-image-get-active-drawable (car export-img)))
+                (set! expdir
+                  (if (not (string=? (substring expdir (- (string-length expdir) 1) (string-length expdir)) "/"))
+                      (string-append expdir "/")
+                      expdir))
                 (set! export-filename
                       (string-append
-                       (substring file 0 (- (string-length file) 4)) ".png"))
-                       ;; (substring file 0 (- (string-length file) 4)) ".pdf"))
+                       expdir (basename_noext file) ".png"))
+                (debugdispay "export-filename=" export-filename)
 
                 (file-png-export 1 ; The run mode { RUN-INTERACTIVE (0), RUN-NONINTERACTIVE (1) }
                                (car export-img) ; Input image
@@ -104,6 +124,7 @@
  "export png" ; description
  "kam1610" ; author
  "4-26-2015" ; date created
+ SF-DIRNAME      "dir"       ""
  SF-DIRNAME      "dir"       ""
  SF-ADJUSTMENT   "topX"        '(  0 0 9999 1 100 0 0)
  SF-ADJUSTMENT   "topY"        '(  0 0 9999 1 100 0 0)
