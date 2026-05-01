@@ -14,6 +14,84 @@
 (define (debugdispay pre body)
   (display pre)(display body)(newline))
 
+;; export-png-for-loop ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (string-split str)
+  (let loop ((chars (string->list str))
+             (current "")
+             (result '()))
+    (cond
+      ((null? chars)
+       (reverse (if (string=? current "")
+                    result
+                    (cons current result))))
+      ((char=? (car chars) #\space)
+       (if (string=? current "")
+           (loop (cdr chars) "" result)
+           (loop (cdr chars) "" (cons current result))))
+      (else
+       (loop (cdr chars)
+             (string-append current (string (car chars)))
+             result)))))
+
+(define (export-png-for-list base-dir out-dir dir-list x y w h resizeW)
+  (let* ((dirs (string-split dir-list)))
+    (for-each
+      (lambda (d)
+        (let ((full-path (string-append base-dir "/" d)))
+          (script-fu-my-export-png full-path out-dir x y w h resizeW)))
+      dirs)))
+
+
+;; export png simple ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (my-export-png-simple file expdir)
+  (let* ((export-img      ())
+         (export-drawable ())
+         (export-filename ()))
+
+    (debugdispay "file"   file)
+    (debugdispay "expdir" expdir)
+
+                (set! export-img (gimp-file-load 1 ; RUN-NONINTERACTIVE
+                                                   ; 0 ; RUN-INTERACTIVE
+                                                 file
+                                                 file))
+                (gimp-image-merge-visible-layers (car export-img)
+                                                  0 ; EXPAND-AS-NECESSARY
+                                                  )
+                (set! expdir
+                  (if (not (string=? (substring expdir (- (string-length expdir) 1) (string-length expdir)) "/"))
+                      (string-append expdir "/")
+                      expdir))
+                (set! export-filename
+                      (string-append
+                       expdir (basename_noext file) ".png"))
+                (debugdispay "export-filename=" export-filename)
+
+                (file-png-export 1 ; The run mode { RUN-INTERACTIVE (0), RUN-NONINTERACTIVE (1) }
+                               (car export-img) ; Input image
+                               ;; (car export-drawable) ; Drawable to save
+                               export-filename ; filename, The name of the file to save the image in
+                               ;; export-filename ; raw-filename, The name of the file to save the image in
+                               () ; options
+                               FALSE    ; interlace, Use Adam7 interlacing?
+                               9        ; Deflate Compression factor (0--9)
+                               FALSE    ; Write bKGD chunk?
+                               FALSE    ; Write oFFs chunk?
+                               TRUE     ; Write pHYs chunk?
+                               TRUE     ; Write tIME chunk?
+                               TRUE     ; save-transparent
+                               FALSE    ; optimize-palette
+                               "auto"   ; format
+                               FALSE    ; include-exif
+                               FALSE    ; include-iptc
+                               FALSE    ; include-xmp
+                               TRUE     ; include-color-profile
+                               FALSE    ; include-thumbnail
+                               FALSE    ; include-comment
+                               )
+                (gimp-image-delete (car export-img)))
+    )
+
 ;; export png ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (script-fu-my-export-png indir expdir topX topY w h resizeW)
   (let* ((flist           ())
