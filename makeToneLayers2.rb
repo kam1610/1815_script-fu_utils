@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 
 require("open3");
+require("tmpdir");
+require("fileutils");
 
 ############################################################
 ## mergeLayerFiles
@@ -68,11 +70,8 @@ end
 ############################################################
 ## main
 
-gimpGetLayerNameCmd=
-  "gimp --batch-interpreter=plug-in-script-fu-eval" +
-  "-i -b \"(script-fu-print-layer-name "            +
-  "\\\"_filename_\\\") "                            +
-  "(gimp-quit TRUE)\"";
+##./makeToneLayer2.rb <srcfile> <dstdir> [workdir]
+
 gimpSaveLayersToFileCmd=
   "gimp  --batch-interpreter=plug-in-script-fu-eval "       +
   "-i -b \"(script-fu-save-layers-to-files-with-tone-ofst " +
@@ -83,36 +82,43 @@ numOfLayers   = 0;
 layerNames    = [];
 layerIsTone   = [];
 orderedDither = "h8x8a";
-fnl           = [];
+fn            = "";
+dstdir        = "";
+tmpdir_base   = "/dev/shm";
 
-if(ARGV.size == 0)
-  fnl= Dir.glob("*.xcf")
+if((ARGV.size != 2) && (ARGV.size != 3))
+  printf("usage: makeToneLayer2.rb <srcfile> <dstdir> [workdir]\n");
+  exit(0);
 else
-  ARGV.each{|i|
-    fnl.push(i);
-  }
+  fn     = File::expand_path(ARGV[0]);
+  dstdir = ARGV[1];
 end
-p("fnl:");
-p(fnl);
+if(ARGV.size == 3)
+  tmpdir_base = ARGV[2];
+end
 
-fnl.each{|fn|
+Dir.mktmpdir(nil, tmpdir_base){|dir|
+  # copy file to tmpdir and change current dir
+  FileUtils.cp(fn, dir, verbose:true);
+  Dir.chdir(dir);
+
   numOfLayers   = 0;
   layerNames    = [];
   layerIsTone   = [];
-
-  fn= File::expand_path(fn);
+  fn_base       = File.basename(fn);
 
   ## extract layers
-  gimpCmd= gimpSaveLayersToFileCmd.gsub("_filename_", fn);
+  gimpCmd= gimpSaveLayersToFileCmd.gsub("_filename_", fn_base);
   printf("run gimp script...\n");
-  printf("  file: " + fn + "\n");
+  printf("  file: " + fn_base + "\n");
   printf("  " + gimpCmd  + "\n");
   printf(`#{gimpCmd}` + "\n");
 
   ## apply halftone
-  Dir.glob(fn+"*"+".png"){|fn2|
+  Dir.glob(fn_base+"*"+".png"){|fn2|
     printf(":::::::: file: %s\n", fn2);
-    if( (fn2 =~ /#{fn}(k\d+)\.png$/) && ($1 != "k100") )
+    if( (fn2 =~ /#{fn_base}(k\d+)\.png$/) && ($1 != "k100") )
+      printf("tonelayer: %s\n", fn2);
       layerIsTone.push(true);
       htCmd= sprintf("convert %s "          +
                      "-colorspace Gray    " +
@@ -126,6 +132,7 @@ fnl.each{|fn|
       printf("%s\n", htCmd);
       printf(`#{htCmd}` + "\n");
     else
+      printf("gslayer: %s\n", fn2);
       layerIsTone.push(false);
     end
     layerNames.push(fn2);
@@ -133,14 +140,9 @@ fnl.each{|fn|
   }
   p(layerNames);
   layerNamesBak= Marshal.load(Marshal.dump(layerNames));
-  mergeLayerFiles(layerNames, fn + ".png");
-  #cropCmd= "mogrify -crop 2150x3035+164+236 \"" + fn + ".png\"";
-  #printf(cropCmd + "\n");
-  #printf(`#{cropCmd}` + "\n");
-  layerNamesBak.each(){|i|
-    rmCmd= "rm \"#{i}\"";
-    printf(rmCmd + "\n");
-    printf(`#{rmCmd}` + "\n"); # for check
-  }
 
+  outfile = fn_base + ".png";
+  mergeLayerFiles(layerNames, outfile);
+  FileUtils.mv(dir + "/" + outfile,
+               dstdir + "/" + outfile, verbose:true);
 }
