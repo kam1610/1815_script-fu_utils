@@ -91,7 +91,7 @@ if((ARGV.size != 2) && (ARGV.size != 3))
   exit(0);
 else
   fn     = File::expand_path(ARGV[0]);
-  dstdir = ARGV[1];
+  dstdir = File::expand_path(ARGV[1]);
 end
 if(ARGV.size == 3)
   tmpdir_base = ARGV[2];
